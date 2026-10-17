@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>入梦</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Antique&family=Zhi+Mang+Xing&family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;500;600&display=swap">
+<style>
+/* Layout: one painted world on a full-screen canvas; ink-and-paper pieces float on it — 题签 labels, 花笺 letters, 花名签 choices, 楹联. */
+:root{
+  --xuan:#f7efdf; --xuan-2:#ecdcbc; --mo:#2a211b; --mo-2:#5f4c3e;
+  --zhu:#ad3427; --zhu-line:rgba(173,52,39,.34); --jin:#c9a35e; --halo:rgba(255,248,236,.92);
+  --brush:'Zhi Mang Xing','STXingkai','Xingkai SC','KaiTi',serif;
+  --kai:'Ma Shan Zheng','STKaiti','KaiTi',serif;
+  --song:'Noto Serif SC','Songti SC','STSong','SimSun',serif;
+  --ke:'Zen Antique','Noto Serif SC','Songti SC',serif;
+  --ink:#3d302a;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;overflow:hidden;background:#ead8b2;color:var(--mo);font-family:var(--song);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer}
+:focus-visible{outline:1.5px solid var(--zhu);outline-offset:4px}
+i{font-style:normal}
+
+#gl,#fx{position:fixed;inset:0;width:100%;height:100%;display:block}
+#gl{touch-action:none}
+#gl.can{cursor:grab}
+#gl.grab{cursor:grabbing}
+#fx{pointer-events:none}
+
+/* ---------- 题 ---------- */
+#title{position:fixed;inset:0;pointer-events:none;transition:opacity 1.4s ease,filter 1.4s ease}
+#title.gone{opacity:0;filter:blur(10px)}
+.ttl{position:absolute;left:50%;top:12vh;transform:translateX(-50%);display:flex;align-items:flex-end;gap:.5vw;font-size:clamp(78px,11vw,168px);opacity:0;filter:blur(14px);transition:opacity 2.6s ease,filter 2.6s ease}
+#title.in .ttl{opacity:1;filter:none}
+.ttl h1{margin:0;font-family:'Ma Shan Zheng',var(--kai);font-weight:400;font-size:1em;line-height:1;letter-spacing:.08em;white-space:nowrap;padding:0 .08em;
+  background:linear-gradient(165deg,#6a5f58 0%,#2f2926 38%,#4a403a 62%,#857a70 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 16px rgba(255,247,232,.85)) drop-shadow(0 0 46px rgba(255,240,216,.6))}
+.tseal{flex:none;width:.2em;height:.49em;margin-bottom:.1em;filter:drop-shadow(0 2px 6px rgba(120,40,20,.25))}
+.tseal .seal{width:100%;height:100%;display:block;opacity:.9}
+#enter{position:absolute;left:50%;bottom:13vh;width:330px;height:88px;margin-left:-165px;pointer-events:auto;display:grid;place-items:center;opacity:0;transition:opacity 1.2s ease}
+#enter.ready{opacity:1}
+#enter[disabled]{cursor:default}
+#enter .stroke{position:absolute;inset:0;width:100%;height:100%;overflow:visible;clip-path:inset(0 100% 0 0);transition:clip-path 1.3s cubic-bezier(.6,.05,.25,1),transform .6s cubic-bezier(.2,.8,.3,1)}
+#enter.ready .stroke{clip-path:inset(-20% -10% -20% -10%)}
+#enter .stroke path{fill:var(--ink);transition:fill .5s}
+#enter .stroke .fb{fill:none;stroke:var(--ink);stroke-linecap:round}
+#enter span{position:relative;font-family:var(--ke);font-size:30px;line-height:1;letter-spacing:.42em;margin-right:-.42em;color:#f5ebd7;transition:letter-spacing .6s cubic-bezier(.2,.8,.3,1),text-shadow .6s}
+#enter:hover .stroke,#enter:focus-visible .stroke{transform:scaleX(1.05)}
+#enter:hover .stroke path,#enter:focus-visible .stroke path{fill:#4b3b31}
+#enter:hover span,#enter:focus-visible span{letter-spacing:.58em;margin-right:-.58em;text-shadow:0 0 12px rgba(255,226,170,.55)}
+.load{position:absolute;left:50%;bottom:calc(13vh + 42px);width:72px;height:1px;margin-left:-36px;background:rgba(61,48,42,.18);transition:opacity .8s}
+.load i{display:block;width:0;height:100%;background:var(--mo);transition:width .5s ease}
+.load.done{opacity:0}
+
+/* ---------- 题签（地点） ---------- */
+#spots{position:fixed;inset:0;pointer-events:none;transition:opacity .8s ease}
+#spots.off{opacity:0}
+#spots.off .spot{pointer-events:none}
+.spot{position:absolute;left:0;top:0;width:0;height:0;pointer-events:auto;will-change:transform}
+.spot .hit{position:absolute;left:-24px;top:-24px;width:48px;height:48px;border-radius:50%}
+.lamp{position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,#fffdf7 0 26%,rgba(255,224,160,.95) 46%,rgba(255,196,110,0) 72%);
+  box-shadow:0 0 16px 7px rgba(255,214,140,.42);animation:lamp 3.4s ease-in-out infinite}
+.spot.who .lamp{background:radial-gradient(circle,#fff7f0 0 24%,rgba(238,128,100,.95) 48%,rgba(214,86,62,0) 72%);box-shadow:0 0 18px 8px rgba(236,126,96,.38)}
+@keyframes lamp{50%{transform:scale(.7);opacity:.72}}
+.slip{position:absolute;left:13px;bottom:2px;padding:11px 7px 10px;white-space:nowrap;text-align:center;
+  font-family:var(--brush);font-size:26px;line-height:1.04;color:var(--mo);
+  background:linear-gradient(180deg,#fcf7ec,#efe2c3);
+  box-shadow:inset 0 0 0 2px #fcf7ec,inset 0 0 0 3px rgba(173,52,39,.32),0 10px 18px -10px rgba(70,40,15,.6),0 1px 2px rgba(70,40,15,.2);
+  transform-origin:50% 100%;transition:transform .45s cubic-bezier(.2,.8,.3,1),opacity .45s}
+.slip::after{content:"";display:block;width:6px;height:6px;margin:7px auto 0;background:var(--zhu)}
+.spot.flip .slip{left:auto;right:13px}
+.spot:hover .slip,.spot:focus-visible .slip{transform:translateY(-5px) scale(1.07)}
+.spot.quiet .slip{opacity:0;transform:translateY(6px) scale(.96);pointer-events:none}
+.spot.quiet:hover .slip,.spot.quiet:focus-visible .slip{opacity:1;transform:none}
+.spot.who .slip{font-size:21px}
+
+/* ---------- 院名题字 / 归 / 提示 ---------- */
+#mark{position:fixed;right:max(26px,env(safe-area-inset-right,0px));top:calc(26px + env(safe-area-inset-top,0px));display:flex;flex-direction:row-reverse;align-items:flex-start;gap:12px;pointer-events:none;opacity:0;transform:translateY(-6px);transition:opacity 1.2s ease,transform 1.2s ease}
+#mark.on{opacity:1;transform:none}
+#mark .nm{font-family:var(--brush);font-size:clamp(40px,3.5vw,58px);line-height:1.02;text-align:center;color:var(--mo);text-shadow:0 0 22px var(--halo),0 0 6px var(--halo)}
+#mark .ln{writing-mode:vertical-rl;height:min(300px,44vh);margin-top:12px;font-size:14.5px;line-height:1.9;letter-spacing:.16em;font-weight:500;color:var(--mo);text-shadow:0 0 10px var(--halo),0 0 3px var(--halo)}
+.pi{color:var(--zhu);font-size:.72em;letter-spacing:.08em;margin-block-start:.5em;display:inline-block}
+#back{position:fixed;left:max(22px,env(safe-area-inset-left,0px));top:calc(22px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:10px;padding:8px 16px 8px 14px;
+  font-family:var(--brush);font-size:27px;line-height:1;color:var(--mo);background:linear-gradient(180deg,#fcf7ec,#efe2c3);
+  box-shadow:inset 0 0 0 2px #fcf7ec,inset 0 0 0 3px rgba(173,52,39,.32),0 10px 18px -10px rgba(70,40,15,.6);opacity:0;pointer-events:none;transition:opacity .8s,transform .4s cubic-bezier(.2,.8,.3,1)}
+#back:hover{transform:translateX(-3px)}
+#back.on{opacity:1;pointer-events:auto}
+#back::before{content:"";display:block;width:9px;height:9px;border-left:1.5px solid var(--zhu);border-bottom:1.5px solid var(--zhu);transform:rotate(45deg);margin-left:4px}
+#hint{position:fixed;left:50%;bottom:calc(26px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font-size:13px;letter-spacing:.42em;color:var(--mo);text-shadow:0 0 12px var(--halo),0 0 4px var(--halo);opacity:0;transition:opacity 1.2s;pointer-events:none;white-space:nowrap}
+#hint.on{opacity:.85}
+
+#mus{position:fixed;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:30;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;gap:2.5px;
+  background:rgba(250,244,231,.62);box-shadow:inset 0 0 0 1px rgba(173,52,39,.22),0 6px 14px -8px rgba(60,32,12,.5);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+#mus i{display:block;width:2px;height:12px;border-radius:1px;background:var(--ink);transform-origin:50% 100%;transform:scaleY(.3);transition:transform .4s}
+#mus.on i{animation:eq 1.8s ease-in-out infinite}
+#mus.on i:nth-child(2){animation-delay:-.6s}#mus.on i:nth-child(3){animation-delay:-1.1s}#mus.on i:nth-child(4){animation-delay:-.3s}
+@keyframes eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+
+/* ---------- 花笺 ---------- */
+#letter{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center}
+.lw{display:flex;align-items:flex-start;gap:30px;transform-origin:50% 50%}
+#letter.narrow .lw{flex-direction:column-reverse;align-items:center;gap:22px}
+.qs{display:flex;flex-direction:row-reverse;align-items:flex-start;gap:14px;min-width:248px;min-height:276px;padding-top:26px}
+#letter.note .qs{display:none}
+.jian{position:relative;flex:none;width:404px;height:560px;cursor:default;
+  background:radial-gradient(130% 95% at 55% 38%,#fcf7ec 0,#f4e8cf 62%,#eadbb9 100%);
+  box-shadow:0 46px 70px -34px rgba(64,34,12,.6),0 6px 14px rgba(64,34,12,.16);transform:rotate(-.5deg)}
+.jian::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.2;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9 .55' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .42  0 0 0 0 .3  0 0 0 0 .16  0 0 0 .9 -.1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.jian::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 46px rgba(150,104,52,.16)}
+.jian.lay{animation:lay .9s cubic-bezier(.2,.8,.25,1) both}
+@keyframes lay{from{opacity:0;transform:translateY(22px) rotate(-1.8deg) scale(.985)}to{opacity:1;transform:rotate(-.5deg)}}
+.frame{position:absolute;left:0;right:0;top:58px;bottom:46px;width:323px;margin:0 auto;border:1.5px solid var(--zhu-line);box-sizing:border-box;
+  background:repeating-linear-gradient(to left,transparent 0 39px,var(--zhu-line) 39px 40px) right top/100% 100%}
+.frame::before,.frame::after{content:"";position:absolute;left:-6px;right:-6px;height:1px;background:var(--zhu-line)}
+.frame::before{top:-7px}.frame::after{bottom:-7px}
+.print{position:absolute;left:18px;bottom:22px;width:210px;height:210px;background:no-repeat center/contain;opacity:.6;mix-blend-mode:multiply;pointer-events:none}
+.shi{position:absolute;left:49px;top:74px;font-size:11.5px;line-height:1.28;color:var(--zhu);opacity:.62;pointer-events:none;text-align:center}
+.wen{position:absolute;inset:0;padding:16px 0;box-sizing:border-box;writing-mode:vertical-rl;font-size:19px;line-height:40px;letter-spacing:.13em;font-weight:500;color:#2c231d;overflow:hidden}
+.wen i,#tw i{opacity:0;animation:ink .8s ease-out both;animation-delay:calc(var(--i) * 38ms)}
+.done i{animation:none!important;opacity:1}
+@keyframes ink{from{opacity:0;filter:blur(3px)}to{opacity:1;filter:none}}
+.sig{display:block;text-align:end;font-family:var(--brush);font-size:25px;font-weight:400;letter-spacing:.05em;color:var(--mo)}
+.sig .seal{display:inline-block;width:34px;height:34px;margin-block-start:8px;vertical-align:middle;opacity:0;animation:stamp .5s ease-out both;animation-delay:calc(var(--i) * 38ms + 250ms)}
+.done .sig .seal{animation:none;opacity:1}
+@keyframes stamp{from{opacity:0;transform:scale(1.35)}to{opacity:.92;transform:none}}
+.ti{display:block;font-family:var(--brush);font-size:31px;font-weight:400;letter-spacing:.06em;color:var(--zhu)}
+#letter.note .jian{width:326px;height:470px}
+#letter.note .frame{width:243px;top:54px;bottom:42px}
+#letter.note .print,#letter.note .shi{display:none}
+
+/* ---------- 问签（垂条） ---------- */
+.qian{position:relative;flex:none;width:48px;height:270px;color:#f2ebde;
+  background:linear-gradient(180deg,rgba(55,64,70,.95) 0,rgba(55,64,70,.9) 32%,rgba(55,64,70,.58) 68%,rgba(55,64,70,0) 100%);
+  transition:transform .5s cubic-bezier(.2,.8,.3,1),filter .5s;animation:hang .8s cubic-bezier(.2,.8,.3,1) both;animation-delay:calc(var(--j) * 110ms)}
+.qian::before{content:"";position:absolute;top:0;bottom:0;left:4px;right:4px;border-left:1px solid rgba(236,226,206,.4);border-right:1px solid rgba(236,226,206,.4);
+  -webkit-mask:linear-gradient(180deg,#000 50%,transparent 92%);mask:linear-gradient(180deg,#000 50%,transparent 92%);pointer-events:none}
+.qian::after{content:"";position:absolute;left:-3px;right:-3px;top:-5px;height:6px;border-radius:2px;background:linear-gradient(180deg,#59656c,#2c3438)}
+.qian span{position:absolute;left:0;right:0;top:24px;height:226px;writing-mode:vertical-rl;font-size:16px;line-height:48px;letter-spacing:.12em;font-weight:500;color:inherit}
+.qian .pt{position:absolute;left:50%;top:9px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:#d0503d;opacity:0;transform:scale(.4);transition:opacity .4s,transform .4s}
+.qian:hover,.qian:focus-visible{transform:translateY(10px);filter:brightness(1.16)}
+.qian:hover .pt,.qian:focus-visible .pt{opacity:1;transform:none}
+.qian.ci{height:150px;color:#fbf4e6;background:linear-gradient(180deg,rgba(128,108,90,.9) 0,rgba(128,108,90,.7) 45%,rgba(128,108,90,0) 100%)}
+.qian.ci::after{background:linear-gradient(180deg,#8e7a68,#5b4c40)}
+.qian.ci span{height:110px}
+@keyframes hang{from{opacity:0;transform:translateY(-22px)}}
+
+/* ---------- 题跋（宝玉立轴） ---------- */
+#tiba{position:fixed;inset:0;z-index:20}
+.tb{position:absolute;right:10.5vw;top:15vh;height:66vh;display:flex;flex-direction:row-reverse;align-items:flex-start;gap:46px}
+#tq{padding-top:0}
+#tw{align-self:flex-start;height:58vh;writing-mode:vertical-rl;font-size:clamp(19px,1.62vw,26px);line-height:2.1;letter-spacing:.17em;font-weight:500;color:#33241b;mix-blend-mode:multiply}
+#tw .sig{font-size:1.3em}
+#tw .sig .seal{width:40px;height:40px}
+#tq{min-width:0}
+
+/* ---------- 楹联 ---------- */
+#lian{position:fixed;inset:0;z-index:20;display:flex;flex-direction:row-reverse;justify-content:center;align-items:flex-start;gap:min(26vw,360px);padding-top:9vh;cursor:pointer}
+.lb{position:relative;width:74px;padding:30px 0 34px;text-align:center;font-family:var(--kai);font-size:clamp(30px,3vw,40px);line-height:1.32;
+  clip-path:inset(0 0 100% 0);animation:unroll 1.4s cubic-bezier(.3,.7,.2,1) forwards;box-shadow:0 30px 40px -24px rgba(40,20,8,.7)}
+.lb.l{animation-delay:.25s}
+@keyframes unroll{to{clip-path:inset(0 0 0 0)}}
+#lian.paper .lb{color:#231a14;background:
+  radial-gradient(circle at 20% 30%,rgba(236,198,120,.75) 0 1px,transparent 1.6px) 0 0/23px 31px,
+  radial-gradient(circle at 70% 60%,rgba(236,198,120,.6) 0 1.2px,transparent 1.8px) 0 0/37px 29px,
+  linear-gradient(180deg,#bb3a2c,#a52f23)}
+#lian.lacquer .lb{background:linear-gradient(90deg,#120d0b,#2a1f19 45%,#18110e);border:3px solid #5a3a22;box-sizing:border-box}
+#lian.lacquer .lb span{background:linear-gradient(160deg,#f7f3ff 0,#d4efe9 22%,#fbe3ef 44%,#e1ecff 66%,#fff4dc 88%);background-size:100% 300%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:pearl 6s ease-in-out infinite alternate}
+@keyframes pearl{to{background-position:0 100%}}
+.lpi{position:absolute;left:50%;bottom:9vh;transform:translateX(-50%);font-size:13px;letter-spacing:.3em;color:var(--zhu);text-shadow:0 0 10px var(--halo),0 0 3px var(--halo)}
+
+@media (max-width:640px){
+  .slip{font-size:19px;padding:9px 6px 8px}
+  #mark .nm{font-size:36px}
+  #mark .ln{display:none}
+  #lian{gap:18vw}
+}
+@media (prefers-reduced-motion:reduce){
+  .lamp,.jian.lay,.qian,.lb,#lian.lacquer .lb span{animation:none!important;clip-path:none}
+  #enter .stroke{transition:none}
+  .wen i,#tw i,.sig .seal{animation:none!important;opacity:1}
+}
+</style>
+
+</head>
+<body>
+<canvas id="gl" aria-label="大观园"></canvas>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div id="spots" class="off"></div>
+<div id="mark" aria-live="polite"></div>
+<button id="back" aria-label="回到大观园">大观园</button>
+<div id="hint"></div>
+<button id="mus" aria-label="背景音乐" aria-pressed="true"><i></i><i></i><i></i><i></i></button>
+
+<section id="title">
+  <div class="ttl"><h1>大观园</h1><span class="tseal" id="tseal"></span></div>
+  <button id="enter" disabled aria-label="入梦"><svg class="stroke" viewBox="0 0 400 96" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="brush" x="-5%" y="-30%" width="110%" height="160%"><feTurbulence type="fractalNoise" baseFrequency=".022 .09" numOctaves="3" seed="8" result="w"/><feDisplacementMap in="SourceGraphic" in2="w" scale="7" xChannelSelector="R" yChannelSelector="G" result="d"/><feTurbulence type="fractalNoise" baseFrequency=".012 .55" numOctaves="2" seed="3" result="s"/><feColorMatrix in="s" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2.4 .15" result="m"/><feComposite in="d" in2="m" operator="in"/></filter></defs><g filter="url(#brush)" opacity=".9"><path d="M14,50 C36,30 92,24 160,26 C228,27 300,21 360,27 C384,30 396,40 391,52 C385,64 356,69 322,66 C256,62 192,72 122,70 C72,69 34,74 16,66 C6,62 6,56 14,50 Z"/><path class="fb" d="M300,30 C335,26 368,29 398,37" stroke-width="2.4" opacity=".55"/><path class="fb" d="M296,62 C330,66 362,64 394,58" stroke-width="2" opacity=".45"/><path class="fb" d="M20,40 C60,30 110,27 150,28" stroke-width="1.6" opacity=".4"/></g></svg><span>入夢</span></button>
+  <div class="load"><i id="loadbar"></i></div>
+</section>
+
+<div id="letter" hidden>
+  <div class="lw" id="lw">
+    <div class="qs" id="qs"></div>
+    <article class="jian" id="jian" role="dialog" aria-modal="true">
+      <div class="print" id="print"></div>
+      <div class="shi" id="shi"></div>
+      <div class="frame"><div class="wen" id="wen"></div></div>
+    </article>
+  </div>
+</div>
+
+<div id="tiba" hidden><div class="tb"><div id="tw"></div><div class="qs" id="tq"></div></div></div>
+<div id="lian" hidden><div class="lb r" id="lr"></div><div class="lb l" id="ll"></div><div class="lpi" id="lpi"></div></div>
+
+<script>
+(()=>{
+/* ================= 内容 ================= */
+const SC={
+  cover:{z:1.08,c:[.5,.48],kPar:.03,kPan:0,wind:1.8,water:1,glint:1,breathe:1,mist:[.64,.9,.13,.45],edge:0,hz:[.5,.001,0],sun:[.29,.03,.24],parts:{petal:30},drag:0},
+  garden:{z:1.14,c:[.5,.5],kPar:.012,kPan:.35,wind:.6,water:1,glint:.45,mist:[2,3,.001,0],edge:.85,hz:[.5,.001,0],sun:[0,0,0],parts:{petal:10},drag:1,zr:[1.02,1.9]},
+  yihong:{z:1.3,c:[.42,.5],kPar:.024,kPan:.7,wind:1.3,water:0,mist:[2,3,.4,.3],edge:0,hz:[.5,.001,0],sun:[.78,0,.2],parts:{petal:44},drag:1,zr:[1.1,1.7]},
+  qinfang:{z:1.3,c:[.42,.5],kPar:.022,kPan:.7,wind:1.6,water:1,mist:[2,3,.001,0],edge:0,hz:[.36,.1,.5],sun:[.9,.12,.22],parts:{petal:14,catkin:24},drag:1,zr:[1.1,1.7]},
+  ouxiang:{z:1.3,c:[.5,.5],kPar:.022,kPan:.7,wind:1.3,water:1,mist:[2,3,.001,0],edge:0,hz:[.38,.1,.45],sun:[.95,.38,.26],parts:{leaf:14,catkin:12},drag:1,zr:[1.1,1.7]},
+  baoyu:{z:1.04,c:[.5,.5],kPar:.012,kPan:0,wind:.5,water:0,mist:[2,3,.001,0],edge:0,hz:[.5,.001,0],sun:[0,0,0],parts:{petal:8},drag:0}
+};
+SC.garden.spots=[
+  {n:'怡红院',uv:[.775,.17],go:'yihong'},
+  {n:'潇湘馆',uv:[.245,.175],talk:'dai',place:'xiaoxiang'},
+  {n:'沁芳亭',uv:[.535,.43],go:'qinfang'},
+  {n:'蘅芜苑',uv:[.17,.42],talk:'chai',place:'hengwu'},
+  {n:'藕香榭',uv:[.845,.47],go:'ouxiang'},
+  {n:'稻香村',uv:[.215,.7],talk:'li',place:'daoxiang'},
+  {n:'沁芳闸桥',uv:[.5,.235],egg:'zhaqiao',quiet:1},
+  {n:'园门',uv:[.752,.8],egg:'gate',quiet:1}
+];
+SC.yihong.spots=[{n:'宝玉',uv:[.215,.52],talk:'bao',who:1},{n:'西府海棠',uv:[.86,.2],egg:'haitang',quiet:1},{n:'穿衣镜',uv:[.63,.43],egg:'jing',quiet:1}];
+SC.qinfang.spots=[{n:'探春',uv:[.405,.445],talk:'tan',who:1},{n:'沁芳',uv:[.385,.16],egg:'qinfang',quiet:1},{n:'堤柳',uv:[.1,.3],egg:'lian1',quiet:1}];
+SC.ouxiang.spots=[{n:'湘云',uv:[.47,.42],talk:'xiang',who:1},{n:'竹桥',uv:[.27,.5],egg:'lian2',quiet:1},{n:'鸳鸯',uv:[.73,.71],egg:'yuanyang',quiet:1}];
+
+const PL={
+  yihong:{n:'怡红院',ln:'「一边种几本芭蕉，那一边乃是一棵西府海棠。」',pi:'第十七回'},
+  qinfang:{n:'沁芳亭',ln:'「清溪泻雪，石磴穿云，白石为栏，环抱池沼。」',pi:'第十七回'},
+  ouxiang:{n:'藕香榭',ln:'「这藕香榭盖在池中，四面有窗，左右有曲廊可通。」',pi:'第三十八回'},
+  xiaoxiang:{n:'潇湘馆',ln:'「一带粉垣，里面数楹修舍，有千百竿翠竹遮映。」',pi:'第十七回'},
+  hengwu:{n:'蘅芜苑',ln:'「一株花木也无，只见许多异草：或有牵藤的，或有引蔓的。」',pi:'第十七回'},
+  daoxiang:{n:'稻香村',ln:'「一带黄泥筑就矮墙，墙头皆用稻茎掩护。有几百株杏花，如喷火蒸霞一般。」',pi:'第十七回'}
+};
+
+// 人物：名、诗社别号（印）、花名签（第六十三回）
+const PE={
+  bao:{n:'宝玉',hao:'怡红公子',tiba:1},
+  dai:{n:'黛玉',hao:'潇湘妃子',hua:'furong',shi:'莫怨东风当自嗟'},
+  chai:{n:'宝钗',hao:'蘅芜君',hua:'mudan',shi:'任是无情也动人'},
+  xiang:{n:'湘云',hao:'枕霞旧友',hua:'haitang',shi:'只恐夜深花睡去'},
+  tan:{n:'探春',hao:'蕉下客',hua:'xing',shi:'日边红杏倚云栽'},
+  li:{n:'李纨',hao:'稻香老农',hua:'mei',shi:'竹篱茅舍自甘心'}
+};
+// 「」内为原文；{…} 为朱批出处
+const TK={
+  bao:{greet:'你也误入了这园子？想知道什么，只管问我。',q:[
+    ['你为何偏爱女孩儿？','我常说：「女儿是水作的骨肉，男人是泥作的骨肉。我见了女儿，我便清爽；见了男子，便觉浊臭逼人。」{第二回}'],
+    ['怡红院名字从何而来？','原题「红香绿玉」，娘娘改作「怡红快绿」。院中芭蕉一绿，海棠一红。{第十八回}'],
+    ['能看看你的通灵玉吗？','这劳什子，人家都没有，偏我有。上面刻着「莫失莫忘，仙寿恒昌」。{第八回}']]},
+  dai:{greet:'你也来看花？开得再好，终有落的时候。',q:[
+    ['你为什么要葬花？','「撂在水里不好。你看这里的水干净，只一流出去，有人家的地方脏的臭的混倒，仍旧把花遭塌了。」{第二十三回}不如埋在土里，随土化了，岂不干净。'],
+    ['能为我念念葬花吟吗？','「花谢花飞花满天，红消香断有谁怜？」「一年三百六十日，风刀霜剑严相逼。」{第二十七回}'],
+    ['为何选住潇湘馆？','「我心里想着潇湘馆好，爱那几竿竹子隐着一道曲栏，比别处更觉幽静。」{第二十三回}']]},
+  chai:{greet:'园子大，走乏了罢？坐下吃杯茶。',q:[
+    ['屋里为何这般素净？','我素来不爱这些花儿粉儿的。老太太来瞧，还嫌我屋里「雪洞一般」。{第四十回}'],
+    ['你的柳絮词写了什么？','她们写柳絮都太悲，我偏翻过来说：「好风凭借力，送我上青云。」{第七十回}'],
+    ['金锁上刻的什么字？','不过是个和尚给的两句吉利话：「不离不弃，芳龄永继。」{第八回}']]},
+  li:{greet:'我是稻香老农。诗我不会作，只管评。',q:[
+    ['杏帘在望是谁的诗？','娘娘赐名「杏帘在望」。那首诗其实是林妹妹替宝玉作的：「杏帘招客饮，在望有山庄。」{第十八回}'],
+    ['宝玉怎么看稻香村？','宝玉嫌这里「远无邻村，近不负郭」，是人力穿凿，为这话挨了老爷一顿骂。{第十七回}'],
+    ['诗社里谁写得最好？','海棠社那日，我这样评林、薛二人：「若论风流别致，自是这首；若论含蓄浑厚，终让蘅稿。」{第三十七回}']]},
+  tan:{greet:'「娣探谨奉二兄文几：前夕新霁，月色如洗，因惜清景难逢，讵忍就卧……」{第三十七回}这是我写给二哥哥的帖子，邀他起诗社。',q:[
+    ['海棠诗社怎么起的？','那日芸儿正巧送来两盆白海棠，大家就叫海棠社，在我的秋爽斋起了社。{第三十七回}'],
+    ['为何自号蕉下客？','我最喜芭蕉，就称「蕉下客」。林丫头偏说要把我这只鹿做了脯子吃酒。{第三十七回}'],
+    ['你心里最想做什么？','「我但凡是个男人，可以出得去，我必早走了，立一番事业，那时自有我一番道理。」{第五十五回}']]},
+  xiang:{greet:'你可算来了！今儿我做东，螃蟹管够。',q:[
+    ['菊花诗谁夺了魁？','十二首菊花诗，林姐姐夺了魁：「孤标傲世偕谁隐，一样花开为底迟？」{第三十八回}'],
+    ['醉卧芍药怎么回事？','那日多吃了几杯，在山石后头的青板石凳上睡着了，芍药花飞了一身。{第六十二回}'],
+    ['你最得意哪句诗？','中秋夜我得了「寒塘渡鹤影」，林姐姐对的是「冷月葬花魂」。{第七十六回}']]}
+};
+const EG={
+  zhaqiao:{t:'沁芳闸桥',x:'「正看到『落红成阵』，只见一阵风过，把树头上桃花吹下一大半来，落的满身满书满地皆是。」{第二十三回}',gust:1},
+  gate:{t:'园门',x:'「只见正门五间，上面桶瓦泥鳅脊；那门栏窗槅，皆是细雕新鲜花样，并无朱粉涂饰。」{第十七回}'},
+  haitang:{t:'西府海棠',x:'「其势若伞，丝垂翠缕，葩吐丹砂。」{第十七回}'},
+  jing:{t:'穿衣镜',x:'刘姥姥醉后误入此间，对着一面大穿衣镜，还当是撞见了亲家母。{第四十一回}'},
+  qinfang:{t:'沁芳',x:'「用『泻玉』二字，则莫若『沁芳』二字，岂不新雅？」{第十七回}'},
+  lian1:{lian:['绕堤柳借三篙翠','隔岸花分一脉香'],pi:'第十七回',style:'paper'},
+  lian2:{lian:['芙蓉影破归兰桨','菱藕香深写竹桥'],pi:'第三十八回',style:'lacquer'},
+  yuanyang:{t:'鸳鸯',x:'园里也有一位鸳鸯，是贾母的大丫鬟。她当众立誓，终身不嫁。{第四十六回}'}
+};
+
+/* ================= 工具 ================= */
+const $=s=>document.querySelector(s);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t;
+const ein=t=>t*t*t, eout=t=>1-Math.pow(1-t,3), eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const stack=s=>[...s].join('<br>');
+const A=2048/1152;
+const CH=38;
+function inkHTML(s,i0=0){
+  let i=i0,out='';
+  s.split(/(\{[^}]+\})/).forEach(seg=>{
+    if(!seg)return;
+    const chars=a=>[...a].map(c=>`<i style="--i:${i++}">${c}</i>`).join('');
+    out+=seg[0]==='{'?`<span class="pi">${chars(seg.slice(1,-1))}</span>`:chars(seg);
+  });
+  return [out,i];
+}
+
+/* ================= 印 ================= */
+let sealN=0;
+function seal(txt,font,col){
+  const id='sl'+(++sealN),ch=[...txt];
+  const T=(c,x,y,fs,sy)=>`<text x="${x}" y="${y}" font-size="${fs}" text-anchor="middle" dominant-baseline="central"${sy?` transform="translate(${x} ${y}) scale(1 ${sy}) translate(${-x} ${-y})"`:''}>${c}</text>`;
+  let g;
+  if(col){
+    const H=ch.length*44+16;
+    return `<svg class="seal" viewBox="0 0 60 ${H}" aria-hidden="true"><defs><filter id="${id}" x="-6%" y="-6%" width="112%" height="112%"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="${sealN*7}" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 7 0 0 0 -2.3" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in" result="c"/><feTurbulence type="fractalNoise" baseFrequency=".07" numOctaves="2" seed="${sealN*3}" result="w"/><feDisplacementMap in="c" in2="w" scale="2.6" xChannelSelector="R" yChannelSelector="G"/></filter></defs><g filter="url(#${id})"><rect x="3" y="3" width="54" height="${H-6}" rx="2" fill="#b0322a"/><g fill="#f7eadb" font-family="${font||'Ma Shan Zheng'},KaiTi,serif">${ch.map((c,i)=>T(c,30,30+i*44,38)).join('')}</g></g></svg>`;
+  }
+  if(ch.length===4)g=T(ch[0],71,29,37)+T(ch[1],71,71,37)+T(ch[2],29,29,37)+T(ch[3],29,71,37);
+  else if(ch.length===3)g=T(ch[0],71,29,37)+T(ch[1],71,71,37)+T(ch[2],29,50,40,1.85);
+  else if(ch.length===2)g=T(ch[0],50,29,40)+T(ch[1],50,71,40);
+  else g=T(ch[0],50,50,62);
+  return `<svg class="seal" viewBox="0 0 100 100" aria-hidden="true"><defs><filter id="${id}" x="-6%" y="-6%" width="112%" height="112%"><feTurbulence type="fractalNoise" baseFrequency="1.15" numOctaves="2" seed="${sealN*7}" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 7 0 0 0 -2.3" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in" result="c"/><feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="2" seed="${sealN*3}" result="w"/><feDisplacementMap in="c" in2="w" scale="3.2" xChannelSelector="R" yChannelSelector="G"/></filter></defs><g filter="url(#${id})"><rect x="6" y="6" width="88" height="88" rx="3" fill="#b0322a"/><g fill="#f7eadb" font-family="${font||'Ma Shan Zheng'},KaiTi,serif">${g}</g></g></svg>`;
+}
+
+/* ================= 笺纸印花（第六十三回花名签） ================= */
+const HUA={
+  furong:{c:['#fbe6e7','#e99aa7'],kind:'big',leaf:'#9aae8a',seed:17},
+  mudan:{c:['#fbe0e7','#d2708f'],kind:'peony',leaf:'#8ea27e',seed:29},
+  haitang:{c:['#fde5e7','#e08795'],kind:'five',bud:'#c55267',leaf:'#9db488',seed:5},
+  xing:{c:['#fef3ee','#edbcb1'],kind:'five',bud:'#d77c74',seed:3},
+  mei:{c:['#fffbf7','#e6c3c0'],kind:'five',bud:'#bd6464',old:1,seed:41}
+};
+const huaCache={};
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function printHua(k){
+  if(huaCache[k])return huaCache[k];
+  const f=HUA[k],R=rng(f.seed),cv=document.createElement('canvas');cv.width=cv.height=420;
+  const x=cv.getContext('2d');x.lineCap='round';x.lineJoin='round';
+  const tips=[],nodes=[];
+  function br(px,py,a,len,w,d){
+    const n=Math.max(5,len/13|0);
+    for(let i=0;i<n;i++){
+      a+=(R()-.5)*(f.old?.55:.24);
+      const nx=px+Math.cos(a)*len/n,ny=py+Math.sin(a)*len/n;
+      x.strokeStyle=f.old?'rgba(74,56,44,.86)':'rgba(92,72,56,.8)';
+      x.lineWidth=Math.max(.9,w*(1-i/n*.75));
+      x.beginPath();x.moveTo(px,py);x.lineTo(nx,ny);x.stroke();
+      if(d<2&&i>1&&i<n-1&&R()<.3)br(nx,ny,a+(R()<.5?-1:1)*(.55+R()*.5),len*(.32+R()*.22),w*.5,d+1);
+      if(i>n*.4&&R()<.3)nodes.push([nx,ny,a]);
+      px=nx;py=ny;
+    }
+    tips.push([px,py,a]);
+  }
+  br(34,408,-1.02,f.kind==='five'?360:300,f.old?10:6.5,0);
+  if(f.kind==='five'&&!f.old)br(120,330,-.45,150,3,1);
+  const leaf=(cx,cy,a,l)=>{x.save();x.translate(cx,cy);x.rotate(a);x.fillStyle=f.leaf;x.globalAlpha=.78;x.beginPath();x.moveTo(0,0);x.quadraticCurveTo(l*.5,-l*.32,l,0);x.quadraticCurveTo(l*.5,l*.32,0,0);x.fill();x.globalAlpha=.5;x.strokeStyle='rgba(70,90,60,.8)';x.lineWidth=.8;x.beginPath();x.moveTo(0,0);x.lineTo(l*.92,0);x.stroke();x.restore()};
+  const pet=(cx,cy,r,a,c0,c1,w,h)=>{x.save();x.translate(cx,cy);x.rotate(a);const g=x.createRadialGradient(0,0,r*.1,r*.6,0,r*1.05);g.addColorStop(0,c1);g.addColorStop(1,c0);x.fillStyle=g;x.beginPath();x.ellipse(r*.55,0,r*w,r*h,0,0,6.2832);x.fill();x.strokeStyle='rgba(190,110,120,.35)';x.lineWidth=.7;x.stroke();x.restore()};
+  const stamens=(cx,cy,r)=>{x.fillStyle='rgba(205,160,70,.95)';for(let k=0;k<9;k++){const a=R()*6.28,d=r*(.15+R()*.22);x.beginPath();x.arc(cx+Math.cos(a)*d,cy+Math.sin(a)*d,r*.05+.6,0,6.28);x.fill()}};
+  const five=(cx,cy,r)=>{const o=R()*6.28;for(let k=0;k<5;k++)pet(cx,cy,r,o+k*1.2566,f.c[0],f.c[1],.5,.44);x.fillStyle='rgba(170,80,70,.55)';x.beginPath();x.arc(cx,cy,r*.14,0,6.28);x.fill();stamens(cx,cy,r)};
+  const bud=(cx,cy,r)=>{x.fillStyle=f.bud;x.globalAlpha=.85;x.beginPath();x.ellipse(cx,cy,r*.7,r,R()*3,0,6.28);x.fill();x.globalAlpha=1};
+  const peony=(cx,cy,r)=>{for(let L=0;L<4;L++){const n=10-L*2,rr=r*(1-L*.2);for(let k=0;k<n;k++)pet(cx,cy,rr,k*6.2832/n+L*.5+R()*.2,f.c[0],f.c[1],.52,.42)}stamens(cx,cy,r*.6)};
+  const big=(cx,cy,r)=>{const o=R()*6.28;for(let k=0;k<5;k++)pet(cx,cy,r,o+k*1.2566,f.c[0],f.c[1],.56,.5);x.strokeStyle='rgba(235,215,170,.95)';x.lineWidth=2.2;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+r*.35,cy-r*.3);x.stroke();stamens(cx+r*.33,cy-r*.28,r*.4)};
+  if(f.leaf)nodes.concat(tips).forEach(p=>{if(R()<.75){leaf(p[0],p[1],p[2]+(R()-.5)*2,(f.kind==='five'?20:34)+R()*16)}});
+  const all=tips.concat(nodes);
+  all.forEach((p,i)=>{
+    if(f.kind==='five'){const r=(f.old?13:15)*(.75+R()*.5);if(R()<.72)five(p[0],p[1],r);else bud(p[0],p[1],r*.42)}
+    else if(i%2===0||i===0){const r=(f.kind==='peony'?38:34)*(.8+R()*.35);(f.kind==='peony'?peony:big)(p[0],p[1],r)}
+    else if(f.bud)bud(p[0],p[1],8);
+  });
+  return huaCache[k]=cv.toDataURL();
+}
+
+/* ================= 画面（WebGL） ================= */
+const cv=$('#gl'),fx=$('#fx'),fc=fx.getContext('2d');
+let W=innerWidth,H=innerHeight,DPR=1,gl=null,U={},glOK=false,c2=null;
+const IMG={},TEX={},AUXD={};
+let SK=null,S=null;
+const cam={c:[.5,.5],tc:[.5,.5],z:1.1,tz:1.1,v:[0,0],par:[0,0],tp:[0,0]};
+let fade=0,blurPx=0,dimmed=false,busy=false,modal=null,tweening=0,hover=null,hiK=0,hx=.5,hy=.5,gust=0,windNow=1,lastMove=-1e9;
+const VS='attribute vec2 a;varying vec2 vP;void main(){vP=vec2(a.x*.5+.5,.5-a.y*.5);gl_Position=vec4(a,0.,1.);}';
+const FS=`precision highp float;varying vec2 vP;
+uniform sampler2D uTex,uAux;uniform vec2 uRes,uC,uR,uOff;uniform float uT,uWind,uWater,uFade,uEdge,uGlint;
+uniform vec4 uMist,uHi;uniform vec3 uHz,uSun;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*n(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}
+void main(){
+  vec2 b=uC+(vP-.5)*uR,uv=b;
+  for(int i=0;i<4;i++){float d=texture2D(uAux,uv).b;uv=b+uOff*(d-.5);}
+  vec3 ax=texture2D(uAux,uv).rgb;float t=uT;
+  float g=.62+.38*sin(uv.x*5.-t*1.1+sin(t*.37)*2.);
+  uv+=vec2(sin(uv.y*34.+t*1.7+sin(uv.x*11.+t*.6)*2.2)*.0026+(n(uv*70.+vec2(t*1.6,0.))-.5)*.002,sin(uv.x*27.+t*1.25)*.0008)*ax.r*uWind*g;
+  float wa=ax.g*uWater;
+  uv+=vec2(sin(uv.y*240.+t*2.1+n(uv*vec2(20.,60.)+t*.25)*6.)*.0008,(n(uv*vec2(26.,140.)+vec2(0.,t*.6))-.5)*.0024)*wa;
+  vec3 c=texture2D(uTex,clamp(uv,vec2(.001),vec2(.999))).rgb;
+  c+=pow(n(uv*vec2(160.,620.)+vec2(t*.5,t*1.6)),16.)*wa*uGlint*vec3(1.,.94,.82);
+  float mz=smoothstep(uMist.x,uMist.y,uv.y)+(1.-smoothstep(0.,uMist.z,uv.y))*uMist.w;
+  mz+=clamp(1.-min(min(uv.x,1.-uv.x)/.1,min(uv.y,1.-uv.y)/.13),0.,1.)*uEdge;
+  mz+=(1.-smoothstep(0.,uHz.y,abs(uv.y-uHz.x)))*uHz.z;
+  float m=clamp(mz,0.,1.)*smoothstep(.3,.85,fbm(uv*vec2(2.6,4.4)+vec2(t*.022,t*.006)));
+  c=mix(c,vec3(1.,.966,.92),m*.62);
+  vec2 sd=(uv-uSun.xy)*vec2(1.7778,1.);
+  c+=uSun.z*exp(-dot(sd,sd)*14.)*(.86+.14*sin(t*.8))*vec3(1.,.88,.66);
+  vec2 hd=(vP-uHi.xy)*vec2(uRes.x/uRes.y,1.);
+  c+=uHi.z*exp(-dot(hd,hd)/(uHi.w*uHi.w))*vec3(1.,.86,.6)*.26;
+  vec2 q=vP-.5;c*=1.-dot(q,q)*.26;
+  gl_FragColor=vec4(mix(c,vec3(1.,.972,.935),uFade),1.);
+}`;
+function initGL(){
+  try{gl=cv.getContext('webgl',{antialias:false,alpha:false,depth:false,stencil:false,premultipliedAlpha:false,powerPreference:'high-performance'})}catch(e){gl=null}
+  if(!gl)return false;
+  const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o};
+  try{
+    const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,VS));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+    gl.useProgram(p);
+    const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+    const loc=gl.getAttribLocation(p,'a');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+    ['uTex','uAux','uRes','uC','uR','uOff','uT','uWind','uWater','uFade','uEdge','uGlint','uMist','uHi','uHz','uSun'].forEach(k=>U[k]=gl.getUniformLocation(p,k));
+    gl.uniform1i(U.uTex,0);gl.uniform1i(U.uAux,1);
+    return true;
+  }catch(e){console.warn(e);return false}
+}
+function makeTex(im){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t}
+function resize(){
+  W=innerWidth;H=innerHeight;DPR=Math.min(devicePixelRatio||1,1.75);
+  cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);fx.width=Math.round(W*DPR);fx.height=Math.round(H*DPR);
+  if(glOK)gl.viewport(0,0,cv.width,cv.height);
+  if(S){cam.tc=clampC(cam.tc,cam.tz);cam.c=clampC(cam.c,cam.z)}
+  fitLetter();
+}
+function ranges(z){const s=W/H;let rx,ry;if(s>A){rx=1;ry=A/s}else{ry=1;rx=s/A}return[rx/z,ry/z]}
+function margins(r){return r.map(v=>{const R=(1-v)/2;return(.5*S.kPar+.5*S.kPan*R)/(1+.5*S.kPan)+.004})}
+function clampC(c,z){const r=ranges(z),m=margins(r);return c.map((v,i)=>{const lo=r[i]/2+m[i],hi=1-r[i]/2-m[i];return lo>hi?.5:clamp(v,lo,hi)})}
+function offVec(){return[cam.par[0]*S.kPar+(cam.c[0]-S.c[0])*S.kPan,cam.par[1]*S.kPar*.6+(cam.c[1]-S.c[1])*S.kPan]}
+function depthAt(u){const a=AUXD[SK];if(!a)return .5;const x=clamp(u[0]*a.w|0,0,a.w-1),y=clamp(u[1]*a.h|0,0,a.h-1);return a.d[(y*a.w+x)*4+2]/255}
+function toScreen(u){const r=ranges(cam.z),o=offVec(),d=depthAt(u)-.5;return[((u[0]-o[0]*d-cam.c[0])/r[0]+.5)*W,((u[1]-o[1]*d-cam.c[1])/r[1]+.5)*H]}
+function draw(t){
+  if(!TEX[SK]&&!IMG[SK])return;
+  const r=ranges(cam.z);
+  if(!glOK){const im=IMG[SK];c2.drawImage(im,(cam.c[0]-r[0]/2)*im.width,(cam.c[1]-r[1]/2)*im.height,r[0]*im.width,r[1]*im.height,0,0,cv.width,cv.height);
+    if(fade>0){c2.fillStyle=`rgba(255,248,239,${fade})`;c2.fillRect(0,0,cv.width,cv.height)}return}
+  const o=offVec();
+  gl.uniform2f(U.uRes,cv.width,cv.height);gl.uniform2f(U.uC,cam.c[0],cam.c[1]);gl.uniform2f(U.uR,r[0],r[1]);gl.uniform2f(U.uOff,o[0],o[1]);
+  gl.uniform1f(U.uT,t);gl.uniform1f(U.uWind,S.wind*windNow);gl.uniform1f(U.uWater,S.water);gl.uniform1f(U.uFade,fade);gl.uniform1f(U.uEdge,S.edge);gl.uniform1f(U.uGlint,S.glint==null?1.6:S.glint);
+  gl.uniform4f(U.uMist,S.mist[0],S.mist[1],S.mist[2],S.mist[3]);gl.uniform3f(U.uHz,S.hz[0],S.hz[1],S.hz[2]);gl.uniform3f(U.uSun,S.sun[0],S.sun[1],S.sun[2]);
+  gl.uniform4f(U.uHi,hx,hy,hiK,.085);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,TEX[SK].img);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,TEX[SK].aux);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+}
+
+/* ================= 花瓣 / 柳絮 / 落叶 ================= */
+const SPR={};
+function sprites(){
+  const mk=(f)=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');x.translate(32,32);f(x);return c};
+  SPR.petal=mk(x=>{const g=x.createLinearGradient(0,-26,0,26);g.addColorStop(0,'#fff0f1');g.addColorStop(.55,'#f8c9cf');g.addColorStop(1,'#eaa2ae');x.fillStyle=g;x.beginPath();x.moveTo(0,26);x.bezierCurveTo(23,10,18,-18,5,-26);x.quadraticCurveTo(0,-19,-5,-26);x.bezierCurveTo(-18,-18,-23,10,0,26);x.fill()});
+  SPR.leaf=mk(x=>{const g=x.createLinearGradient(-20,0,20,0);g.addColorStop(0,'#c98a33');g.addColorStop(.5,'#ecc06a');g.addColorStop(1,'#d39a3f');x.fillStyle=g;x.beginPath();x.moveTo(0,-28);x.quadraticCurveTo(15,0,0,28);x.quadraticCurveTo(-15,0,0,-28);x.fill();x.strokeStyle='rgba(140,90,30,.6)';x.lineWidth=1.2;x.beginPath();x.moveTo(0,-26);x.lineTo(0,26);x.stroke()});
+  SPR.catkin=mk(x=>{const g=x.createRadialGradient(0,0,0,0,0,30);g.addColorStop(0,'rgba(255,255,252,.95)');g.addColorStop(.35,'rgba(255,252,244,.55)');g.addColorStop(1,'rgba(255,250,240,0)');x.fillStyle=g;x.beginPath();x.arc(0,0,30,0,6.2832);x.fill()});
+}
+let PT=[];
+const SIZE={petal:12,leaf:17,catkin:9},FALL={petal:26,leaf:34,catkin:9};
+function np(type,any){const z=.32+Math.random()*.68;return{type,z,x:Math.random()*W*1.2-W*.2,y:any?Math.random()*H:-30-Math.random()*H*.25,s:SIZE[type]*(.55+z*.9),r:Math.random()*6.28,vr:(Math.random()-.5)*2.2,f:Math.random()*6.28,vf:.8+Math.random()*2.6,ph:Math.random()*6.28,fall:FALL[type]*(.55+z*.75)}}
+function seedParts(spec){PT=[];for(const k in spec)for(let i=0;i<spec[k];i++)PT.push(np(k,true))}
+let cur={x:-999,y:-999,vx:0,vy:0};
+function stepParts(dt,t){
+  const keep=[];
+  for(const p of PT){
+    const flo=p.type==='catkin'?(.5+.5*Math.sin(t*.8+p.ph)):1;
+    p.y+=p.fall*dt*flo;p.x+=(windNow*36*p.z+Math.sin(t*.9+p.ph)*14*p.z+(p.burst?p.burst:0))*dt;
+    if(p.burst)p.burst*=Math.exp(-dt*.6);
+    const dx=p.x-cur.x,dy=p.y-cur.y,d2=dx*dx+dy*dy;
+    if(d2<14000){const sp=Math.min(30,Math.hypot(cur.vx,cur.vy));p.x+=cur.vx*.05*sp*dt*p.z;p.y+=cur.vy*.05*sp*dt*p.z}
+    p.r+=p.vr*dt*(1+windNow*.4);p.f+=p.vf*dt;
+    if(p.y>H+40||p.x>W+60||p.x<-W*.3){if(p.extra)continue;Object.assign(p,np(p.type,false))}
+    keep.push(p);
+  }
+  PT=keep;
+  cur.vx*=.9;cur.vy*=.9;
+}
+function drawParts(){
+  fc.setTransform(1,0,0,1,0,0);fc.clearRect(0,0,fx.width,fx.height);
+  for(const p of PT){
+    const ox=-cam.par[0]*36*p.z,oy=-cam.par[1]*18*p.z,sy=Math.abs(Math.cos(p.f))*.82+.18,c=Math.cos(p.r),s=Math.sin(p.r);
+    fc.setTransform(c*DPR,s*DPR,-s*sy*DPR,c*sy*DPR,(p.x+ox)*DPR,(p.y+oy)*DPR);
+    fc.globalAlpha=.5+.45*p.z;fc.drawImage(SPR[p.type],-p.s/2,-p.s/2,p.s,p.s);
+  }
+  fc.globalAlpha=1;
+}
+function gustNow(){gust=2.4;for(let i=0;i<90;i++){const p=np('petal',false);p.x=-30-Math.random()*W*.35;p.y=Math.random()*H*.75;p.burst=260+Math.random()*220;p.extra=1;PT.push(p)}}
+
+/* ================= 题签 ================= */
+const spotsEl=$('#spots');let SP=[];
+function buildSpots(list){
+  spotsEl.innerHTML='';hover=null;
+  SP=list.map(sp=>{
+    const b=document.createElement('button');
+    b.className='spot'+(sp.quiet?' quiet':'')+(sp.who?' who':'');b.setAttribute('aria-label',sp.n);
+    b.innerHTML=`<span class="hit"></span><i class="lamp"></i><span class="slip">${stack(sp.n)}</span>`;
+    b.addEventListener('click',()=>act(sp));
+    b.addEventListener('pointerenter',()=>hover=sp);b.addEventListener('pointerleave',()=>{if(hover===sp)hover=null});
+    b.addEventListener('focus',()=>hover=sp);b.addEventListener('blur',()=>{if(hover===sp)hover=null});
+    spotsEl.appendChild(b);return{sp,b,p:[0,0]};
+  });
+}
+function updateSpots(){
+  for(const o of SP){const p=toScreen(o.sp.uv);o.p=p;o.b.style.transform=`translate3d(${p[0].toFixed(1)}px,${p[1].toFixed(1)}px,0)`;o.b.classList.toggle('flip',p[0]>W-100)}
+  if(hover){const o=SP.find(o=>o.sp===hover);if(o){hx=o.p[0]/W;hy=o.p[1]/H}}
+}
+const spotsOn=()=>spotsEl.classList.remove('off'),spotsOff=()=>spotsEl.classList.add('off');
+function act(sp){
+  if(busy||modal)return;quiet();if(sp.egg||sp.talk)spotsOff();
+  if(sp.go)enterScene(sp.go,sp);
+  else if(sp.talk&&SK==='garden')visit(sp);
+  else if(sp.talk)talk(sp.talk);
+  else if(sp.egg)egg(sp.egg);
+}
+
+/* ================= 相机 ================= */
+function setScene(k,o={}){
+  SK=k;S=SC[k];
+  const z=o.z||S.z;cam.z=cam.tz=z;cam.c=clampC((o.c||S.c).slice(),z);cam.tc=cam.c.slice();cam.v=[0,0];
+  seedParts(S.parts);buildSpots(S.spots||[]);
+  cv.classList.toggle('can',!!S.drag);
+}
+function tween(ms,fn){tweening++;return new Promise(res=>{const s=performance.now();const st=n=>{const k=RM?1:Math.min(1,(n-s)/ms);fn(k);if(k<1)requestAnimationFrame(st);else{tweening--;res()}};requestAnimationFrame(st)})}
+function applyFilter(anim){const f=dimmed?'blur(7px) brightness(.84) saturate(.92)':blurPx>.3?`blur(${blurPx.toFixed(1)}px)`:'none';for(const el of[cv,fx]){el.style.transition=anim?'filter .8s ease':'none';el.style.filter=f}}
+const setBlur=px=>{blurPx=px;applyFilter(false)};
+const dim=on=>{dimmed=on;applyFilter(true)};
+async function dream(k,o={}){
+  busy=true;spotsOff();markOff();$('#back').classList.remove('on');hover=null;
+  const c0=cam.c.slice(),z0=cam.z,f=o.focus||c0;
+  await tween(1150,p=>{const e=ein(p),m=eout(p);cam.z=cam.tz=z0*(1+.42*e);cam.c=[lerp(c0[0],f[0],m*.8),lerp(c0[1],f[1],m*.8)];cam.tc=cam.c.slice();fade=Math.min(1,e*1.2);setBlur(e*10)});
+  const z1=o.z||SC[k].z;
+  setScene(k,{c:o.c,z:z1*1.32});
+  const cs=cam.c.slice();
+  await tween(1400,p=>{const e=eout(p);cam.z=cam.tz=z1*(1.32-.32*e);cam.c=clampC(cs,cam.z);cam.tc=cam.c.slice();fade=1-e;setBlur(10*(1-e))});
+  setBlur(0);fade=0;busy=false;
+}
+async function fly(c,z,ms){
+  const c0=cam.c.slice(),z0=cam.z,ct=clampC(c,z);
+  await tween(ms,p=>{const e=eio(p);cam.z=cam.tz=lerp(z0,z,e);cam.c=[lerp(c0[0],ct[0],e),lerp(c0[1],ct[1],e)];cam.tc=cam.c.slice()});
+}
+
+/* ================= 场景切换 ================= */
+function markOn(pl){if(!pl)return;const m=$('#mark');m.innerHTML=`<div class="nm">${stack(pl.n)}</div><div class="ln">${pl.ln}<span class="pi">${pl.pi}</span></div>`;requestAnimationFrame(()=>m.classList.add('on'))}
+const markOff=()=>$('#mark').classList.remove('on');
+const seen={};
+function hintOnce(k,txt){if(seen[k])return;seen[k]=1;const h=$('#hint');h.textContent=txt;h.classList.add('on');clearTimeout(h._t);h._t=setTimeout(()=>h.classList.remove('on'),4800)}
+const quiet=()=>$('#hint').classList.remove('on');
+async function enterScene(k,sp){
+  await dream(k,{focus:sp.uv});
+  markOn(PL[k]);$('#back').classList.add('on');spotsOn();hintOnce('scene','拖动环顾');
+}
+async function backToGarden(){
+  if(busy||modal||SK==='garden'||SK==='cover')return;
+  const sp=SC.garden.spots.find(s=>s.go===SK);
+  await dream('garden',{c:sp?sp.uv:[.5,.5]});
+  spotsOn();
+}
+$('#back').addEventListener('click',backToGarden);
+async function visit(sp){
+  busy=true;spotsOff();hover=null;
+  const snap={c:cam.c.slice(),z:cam.z};
+  await fly(sp.uv,2.05,1200);
+  busy=false;markOn(PL[sp.place]);
+  talk(sp.talk,{after:async()=>{markOff();busy=true;await fly(snap.c,snap.z,1100);busy=false;spotsOn()}});
+}
+
+/* ================= 对话：花笺 / 题跋 ================= */
+let D=null;
+async function talk(pid,o={}){
+  const pe=PE[pid];modal='talk';
+  D={pid,asked:new Set(),after:o.after,mode:pe.tiba&&W>=900&&W/H>1.25?'tiba':'letter'};
+  if(D.mode==='tiba'){
+    D.prev={k:SK,c:cam.c.slice(),z:cam.z};
+    const sp=(S.spots||[]).find(s=>s.talk===pid);
+    await dream('baoyu',{focus:sp?sp.uv:cam.c});
+    $('#tiba').hidden=false;
+  }else{
+    $('#letter').classList.remove('note');
+    $('#print').style.backgroundImage=pe.hua?`url(${printHua(pe.hua)})`:'none';
+    $('#shi').innerHTML=pe.shi?stack(pe.shi):'';
+    dim(true);$('#letter').hidden=false;fitLetter();
+  }
+  say(TK[pid].greet);
+}
+function say(txt){
+  const pe=PE[D.pid],[html,n]=inkHTML(txt);
+  const box=D.mode==='tiba'?$('#tw'):$('#wen');
+  box.classList.remove('done');
+  box.innerHTML=html+`<span class="sig"><i style="--i:${n}">${pe.n}</i>${seal(pe.hao).replace('<svg class="seal"',`<svg class="seal" style="--i:${n}"`)}</span>`;
+  if(D.mode==='letter'){const j=$('#jian');j.classList.remove('lay');void j.offsetWidth;j.classList.add('lay')}
+  const qs=D.mode==='tiba'?$('#tq'):$('#qs');qs.innerHTML='';
+  clearTimeout(D.tm);D.tm=setTimeout(slips,RM?0:Math.min(n*CH+700,4600));
+}
+function finishInk(){if(!D)return;const box=D.mode==='tiba'?$('#tw'):$('#wen');if(box.classList.contains('done'))return;box.classList.add('done');clearTimeout(D.tm);slips()}
+function slips(){
+  if(!D)return;const t=TK[D.pid],qs=D.mode==='tiba'?$('#tq'):$('#qs');
+  if(qs.childElementCount)return;
+  const items=t.q.map((q,i)=>({l:q[0],i})).filter(o=>!D.asked.has(o.i));
+  items.forEach((o,j)=>qs.appendChild(qian(o.l,j,()=>{D.asked.add(o.i);say(t.q[o.i][1])})));
+  qs.appendChild(qian('告辞',items.length,closeTalk,1));
+}
+function qian(label,j,fn,ci){const b=document.createElement('button');b.className='qian'+(ci?' ci':'');b.style.setProperty('--j',j);b.innerHTML=`<i class="pt"></i><span>${label}</span>`;b.addEventListener('click',e=>{e.stopPropagation();fn()});return b}
+async function closeTalk(){
+  if(!D)return;const d=D;D=null;clearTimeout(d.tm);
+  if(d.mode==='tiba'){$('#tiba').hidden=true;$('#tq').innerHTML='';await dream(d.prev.k,{c:d.prev.c,z:d.prev.z});markOn(PL[d.prev.k]);$('#back').classList.add('on');spotsOn()}
+  else{$('#letter').hidden=true;$('#qs').innerHTML='';dim(false);if(!d.after)spotsOn()}
+  modal=null;if(d.after)d.after();
+}
+function fitLetter(){
+  const L=$('#letter');if(L.hidden)return;
+  L.classList.toggle('narrow',W<760);
+  const lw=$('#lw');lw.style.transform='none';
+  const w=lw.offsetWidth,h=lw.offsetHeight,s=Math.min(1,(W-28)/w,(H-28)/h);
+  lw.style.transform=`scale(${s})`;
+}
+$('#jian').addEventListener('click',e=>{e.stopPropagation();if(modal==='egg')closeEgg();else finishInk()});
+$('#tw').addEventListener('click',finishInk);
+$('#letter').addEventListener('click',()=>{if(modal==='egg')closeEgg();else if(modal==='talk')closeTalk()});
+
+/* ================= 彩蛋 ================= */
+function egg(id){
+  const e=EG[id];modal='egg';
+  if(e.lian){const L=$('#lian');L.className=e.style;$('#lr').innerHTML=`<span>${stack(e.lian[0])}</span>`;$('#ll').innerHTML=`<span>${stack(e.lian[1])}</span>`;$('#lpi').textContent=e.pi;L.hidden=false;dim(true);return}
+  if(e.gust)gustNow();
+  setTimeout(()=>{
+    if(modal!=='egg')return;
+    $('#letter').classList.add('note');$('#qs').innerHTML='';
+    const[html]=inkHTML(e.x,[...e.t].length);
+    const w=$('#wen');w.classList.remove('done');
+    w.innerHTML=`<span class="ti">${[...e.t].map((c,i)=>`<i style="--i:${i}">${c}</i>`).join('')}</span>`+html;
+    const j=$('#jian');j.classList.remove('lay');void j.offsetWidth;j.classList.add('lay');
+    dim(true);$('#letter').hidden=false;fitLetter();
+  },e.gust?1300:0);
+}
+function closeEgg(){$('#letter').hidden=true;$('#lian').hidden=true;$('#letter').classList.remove('note');dim(false);modal=null;spotsOn()}
+$('#lian').addEventListener('click',closeEgg);
+
+/* ================= 交互 ================= */
+const drag={on:false,lx:0,ly:0,lt:0};
+cv.addEventListener('pointerdown',e=>{
+  if(!S||!S.drag||busy||modal)return;
+  drag.on=true;drag.lx=e.clientX;drag.ly=e.clientY;drag.lt=performance.now();cam.v=[0,0];
+  try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  cv.classList.add('grab');
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drag.on)return;
+  const r=ranges(cam.z),dx=e.clientX-drag.lx,dy=e.clientY-drag.ly;drag.lx=e.clientX;drag.ly=e.clientY;
+  const du=-dx/W*r[0],dv=-dy/H*r[1];cam.tc[0]+=du;cam.tc[1]+=dv;
+  const now=performance.now(),dtm=Math.max(8,now-drag.lt);drag.lt=now;cam.v=[du/dtm*16.7,dv/dtm*16.7];
+  if(Math.abs(dx)+Math.abs(dy)>2)quiet();
+});
+const endDrag=()=>{if(!drag.on)return;drag.on=false;cv.classList.remove('grab');if(performance.now()-drag.lt>90)cam.v=[0,0]};
+cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
+addEventListener('pointermove',e=>{
+  lastMove=performance.now();cam.tp=[(e.clientX/W-.5)*2,(e.clientY/H-.5)*2];
+  cur.vx=e.clientX-cur.x;cur.vy=e.clientY-cur.y;if(Math.abs(cur.vx)>200)cur.vx=0;if(Math.abs(cur.vy)>200)cur.vy=0;cur.x=e.clientX;cur.y=e.clientY;
+});
+addEventListener('wheel',e=>{
+  if(!S||!S.drag||busy||modal)return;e.preventDefault();
+  const z0=cam.tz,z1=clamp(z0*Math.exp(-e.deltaY*.0015),S.zr[0],S.zr[1]);if(z1===z0)return;
+  const p=[e.clientX/W-.5,e.clientY/H-.5],r0=ranges(z0),r1=ranges(z1),u=[cam.tc[0]+p[0]*r0[0],cam.tc[1]+p[1]*r0[1]];
+  cam.tz=z1;cam.tc=[u[0]-p[0]*r1[0],u[1]-p[1]*r1[1]];quiet();
+},{passive:false});
+addEventListener('keydown',e=>{
+  if(e.key==='Escape'){if(modal==='talk')closeTalk();else if(modal==='egg')closeEgg();else backToGarden();return}
+  if(modal==='talk'&&(e.key===' '||e.key==='Enter')&&document.activeElement===document.body){e.preventDefault();finishInk();return}
+  if(!S||!S.drag||busy||modal)return;
+  const k={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
+  if(k){e.preventDefault();const r=ranges(cam.z);cam.v=[k[0]*r[0]*.006,k[1]*r[1]*.006]}
+});
+addEventListener('resize',resize);
+
+/* ================= 主循环 ================= */
+let t0=performance.now(),lastT=0;
+function frame(now){
+  const t=(now-t0)/1000,dt=Math.min(.05,Math.max(0,t-lastT));lastT=t;
+  if(S){
+    if(now-lastMove>3500)cam.tp=[Math.sin(t*.16)*.55,Math.cos(t*.12)*.35];
+    const kp=1-Math.exp(-dt*2.4);cam.par[0]=lerp(cam.par[0],cam.tp[0],kp);cam.par[1]=lerp(cam.par[1],cam.tp[1],kp);
+    if(!tweening){
+      if(!drag.on){cam.tc[0]+=cam.v[0]*dt*60;cam.tc[1]+=cam.v[1]*dt*60;const f=Math.pow(.9,dt*60);cam.v[0]*=f;cam.v[1]*=f}
+      if(S.breathe)cam.tz=S.z*(1+.014*Math.sin(t*.22));
+      cam.z=lerp(cam.z,cam.tz,1-Math.exp(-dt*7));
+      cam.tc=clampC(cam.tc,cam.tz);
+      const k=1-Math.exp(-dt*(drag.on?24:9));cam.c=clampC([lerp(cam.c[0],cam.tc[0],k),lerp(cam.c[1],cam.tc[1],k)],cam.z);
+    }
+    windNow=.55+.3*Math.sin(t*.21)+.15*Math.sin(t*.67+1.3)+gust;gust*=Math.exp(-dt*.55);
+    hiK=lerp(hiK,hover&&!modal?1:0,1-Math.exp(-dt*6));
+    draw(t);
+    if(!RM)stepParts(dt,t);
+    drawParts();updateSpots();
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ================= 启动 ================= */
+const ORDER=['cover','garden','yihong','qinfang','ouxiang','baoyu'];
+let ready=false;
+const loadImg=src=>new Promise((res,rej)=>{const i=new Image();i.decoding='async';i.onload=()=>res(i);i.onerror=rej;i.src=src});
+async function loadScene(k,bump){
+  const[im,ax]=await Promise.all([loadImg(`img/${k}.jpg`).then(x=>(bump(),x)),loadImg(`img/${k}_aux.png`).then(x=>(bump(),x))]);
+  IMG[k]=im;
+  const c=document.createElement('canvas');c.width=ax.width;c.height=ax.height;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(ax,0,0);
+  AUXD[k]={w:ax.width,h:ax.height,d:x.getImageData(0,0,ax.width,ax.height).data};
+  if(glOK)TEX[k]={img:makeTex(im),aux:makeTex(ax)};
+}
+async function boot(){
+  glOK=initGL();if(!glOK)c2=cv.getContext('2d');
+  resize();sprites();
+  let done=0;const total=ORDER.length*2,bump=()=>{done++;$('#loadbar').style.width=(done/total*100)+'%'};
+  try{await loadScene('cover',bump)}catch(e){console.warn(e)}
+  setScene('cover');requestAnimationFrame(frame);
+  const fontsReady=document.fonts?Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,2500))]):Promise.resolve();
+  fontsReady.then(()=>$('#title').classList.add('in'));
+  for(const k of ORDER.slice(1)){try{await loadScene(k,bump)}catch(e){console.warn(e)}}
+  ready=true;$('.load').classList.add('done');const b=$('#enter');b.disabled=false;b.classList.add('ready');
+}
+/* ================= 琴声 ================= */
+let actx=null,mGain=null,mBuf=null,mSrc=null,musOn=true,mBytes=null;
+const musBtn=$('#mus');
+fetch('audio/guqin.mp3').then(r=>r.ok?r.arrayBuffer():null).then(b=>{mBytes=b}).catch(()=>{});
+async function startMusic(){
+  if(!musOn||mSrc)return;
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+    actx=actx||new AC();if(actx.state==='suspended')actx.resume();
+    if(!mBuf){
+      const bytes=mBytes||await fetch('audio/guqin.mp3').then(r=>r.arrayBuffer());
+      mBuf=await new Promise((res,rej)=>actx.decodeAudioData(bytes.slice(0),res,rej));
+    }
+    if(!musOn||mSrc)return;
+    if(!mGain){mGain=actx.createGain();mGain.connect(actx.destination)}
+    mSrc=actx.createBufferSource();mSrc.buffer=mBuf;mSrc.loop=true;mSrc.connect(mGain);
+    const n=actx.currentTime;mGain.gain.cancelScheduledValues(n);mGain.gain.setValueAtTime(0,n);mGain.gain.linearRampToValueAtTime(.42,n+5);
+    mSrc.start();musBtn.classList.add('on');
+  }catch(e){console.warn(e)}
+}
+function stopMusic(){
+  musBtn.classList.remove('on');if(!mSrc||!actx)return;const src=mSrc;mSrc=null;
+  const n=actx.currentTime;mGain.gain.cancelScheduledValues(n);mGain.gain.setValueAtTime(mGain.gain.value,n);mGain.gain.linearRampToValueAtTime(0,n+.8);
+  setTimeout(()=>{try{src.stop()}catch(_){}},900);
+}
+musBtn.addEventListener('click',e=>{e.stopPropagation();musOn=!musOn;musBtn.setAttribute('aria-pressed',musOn);if(musOn)startMusic();else stopMusic()});
+addEventListener('pointerdown',()=>startMusic());
+addEventListener('keydown',()=>startMusic());
+document.addEventListener('visibilitychange',()=>{if(!actx)return;if(document.hidden)actx.suspend();else if(musOn)actx.resume()});
+$('#tseal').innerHTML=seal('紅樓夢','Zen Antique',1);
+
+$('#enter').addEventListener('click',async()=>{
+  if(!ready||busy)return;
+  $('#title').classList.add('gone');
+  await dream('garden',{focus:[.46,.42]});
+  $('#title').hidden=true;spotsOn();hintOnce('garden','拖动环顾　·　点选院落');
+});
+boot();
+})();
+</script>
+
+</body>
+</html>
